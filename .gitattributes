@@ -1,4 +1,2 @@
-deploy/*.sh text eol=lf
-tests/*.sh text eol=lf
-deploy/*.service text eol=lf
-deploy/*.example text eol=lf
+# Use LF for text on Windows and Linux; keep detected binary files unchanged.
+* text=auto eol=lf
