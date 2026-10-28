@@ -1,0 +1,5 @@
+# 把 eco.example.com 替换为域名，并设置 PUBLIC_ORIGIN=https://你的域名。
+eco.example.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:3000
+}

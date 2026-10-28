@@ -1,0 +1,45 @@
+services:
+  eco:
+    build: .
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${BIND_IP:-0.0.0.0}:${PORT:-3000}:3000"
+    environment:
+      PORT: 3000
+      WORLD_WIDTH: ${WORLD_WIDTH:-512}
+      WORLD_HEIGHT: ${WORLD_HEIGHT:-384}
+      WORLD_SEED: ${WORLD_SEED:-42}
+      MAX_ANIMALS: ${MAX_ANIMALS:-1200}
+      MAX_CLIENTS: ${MAX_CLIENTS:-30}
+      TICK_HZ: ${TICK_HZ:-5}
+      PUSH_HZ: ${PUSH_HZ:-2}
+      SAVE_SECONDS: ${SAVE_SECONDS:-30}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?请在 .env 设置随机管理口令}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
+      NODE_OPTIONS: --max-old-space-size=${NODE_HEAP_MB:-128}
+    volumes:
+      - eco-data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    mem_limit: ${MEM_LIMIT:-256m}
+    cpus: ${CPU_LIMIT:-0.50}
+    pids_limit: 64
+    stop_grace_period: 20s
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: '3'
+volumes:
+  eco-data:

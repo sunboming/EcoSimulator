@@ -1,0 +1,17 @@
+{
+  "name": "wildhaven", "version": "1.0.0", "private": true, "type": "module",
+  "engines": { "node": ">=24.11.0" },
+  "scripts": {
+    "dev": "npm run build && node --watch --env-file-if-exists=.env dist/server/index.js",
+    "build": "tsc -p tsconfig.json && vite build",
+    "start": "node --env-file-if-exists=.env dist/server/index.js",
+    "pretest": "tsc -p tsconfig.json",
+    "test": "tsx --test tests/*.test.ts",
+    "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.client.json",
+    "bench": "tsx scripts/benchmark.ts",
+    "bench:stress": "tsx scripts/stress.ts",
+    "bench:large": "tsx scripts/large-benchmark.ts"
+  },
+  "dependencies": { "ws": "^8.18.3" },
+  "devDependencies": { "@types/node": "^24.0.0", "@types/ws": "^8.18.1", "tsx": "^4.20.0", "typescript": "^5.9.3", "vite": "^7.1.0" }
+}

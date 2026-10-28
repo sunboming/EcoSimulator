@@ -1,0 +1,89 @@
+/* Shared semantic palette for the observatory, laboratory and canvas charts. */
+:root {
+  color-scheme: dark;
+  scrollbar-color: var(--muted) var(--inset);
+  --bg: #0d1714;
+  --panel: #15231d;
+  --surface: #1c2d24;
+  --surface-hover: #2a4032;
+  --inset: #101c17;
+  --border: #4b6454;
+  --text: #edf3e7;
+  --muted: #b6c8b5;
+  --lime: #c8e591;
+  --mint: #8fe0c1;
+  --orange: #ffc08a;
+  --blue: #8fd0ed;
+  --pale: #d9dcad;
+  --on-accent: #192711;
+  --warning-bg: #392c1d;
+  --warning-text: #ffdbad;
+  --danger-bg: #442a24;
+  --danger-text: #ffd0bc;
+  --chart-grid: #4b6454;
+  --chart-axis: #c0d0bc;
+  --chart-cursor: #e6f3cb;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f2f5ed;
+  --panel: #ffffff;
+  --surface: #e7eee0;
+  --surface-hover: #d9e5d2;
+  --inset: #edf2e7;
+  --border: #a4b59b;
+  --text: #203322;
+  --muted: #52664c;
+  --lime: #426916;
+  --mint: #176b56;
+  --orange: #a24e16;
+  --blue: #236d96;
+  --pale: #72661e;
+  --on-accent: #ffffff;
+  --warning-bg: #fff0d7;
+  --warning-text: #794314;
+  --danger-bg: #fbe7df;
+  --danger-text: #953b24;
+  --chart-grid: #bac8b2;
+  --chart-axis: #52664c;
+  --chart-cursor: #355823;
+}
+body, .laboratory { background: var(--bg); color: var(--text); }
+.theme-toggle { flex-shrink: 0; white-space: nowrap; font-size: 11px; min-height: 34px; }
+button.theme-toggle { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+button.theme-toggle:hover { background: var(--surface-hover); }
+.topbar { gap: clamp(12px, 3vw, 55px); }
+.metrics article { background: linear-gradient(115deg, var(--surface), var(--panel)); }
+.primary, .speed-group .selected, .laboratory .lab-primary { background: var(--lime); color: var(--on-accent); border-color: var(--lime); }
+.primary:hover, .laboratory .lab-primary:hover:enabled { background: var(--lime); color: var(--on-accent); filter: brightness(1.08); }
+input[type=range] { background: linear-gradient(to right,var(--lime) var(--range-progress,50%),var(--border) var(--range-progress,50%)); }
+input[type=range]::-webkit-slider-thumb { background: var(--lime); border-color: var(--panel); box-shadow: 0 0 0 1px var(--lime); }
+input[type=range]::-moz-range-thumb { background: var(--lime); border-color: var(--panel); }
+input::placeholder { color: var(--muted); opacity: 1; }
+:where(button, input, select, summary, a):focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+.green, .green-line { background: var(--lime); }
+.mint, .mint-line { background: var(--mint); }
+.orange, .orange-line { background: var(--orange); }
+.blue { background: var(--blue); }
+.pale, .pale-line { background: var(--pale); }
+.metric-spark { opacity: 1; }
+.metrics small, .range-ends, .control-tip, .chart-caption, .chart-period,
+.environment-note, .parameter-field p, .species-guide small, .ecology-strip span { font-size: 11px; line-height: 1.7; }
+.laboratory .field-identity p, .laboratory .lab-review p, .laboratory .analysis-card>p,
+.laboratory .model-notes p { font-size: 12px; }
+.laboratory .rabbit-key:before { background: var(--mint); }
+.laboratory .water-key:before { background: var(--blue); }
+dialog::backdrop, .laboratory dialog::backdrop { background: #030b08b3; }
+.map-coordinate { color: #edf3d9; background: #102019d9; padding: 5px 7px; border-radius: 4px; text-shadow: none; }
+.chart-legend button[aria-pressed=false] { opacity: .7; }
+.sync-banner, .lab-notice { background: var(--warning-bg); color: var(--warning-text); }
+.danger, #toast.error, .lab-toast.error { background: var(--danger-bg); color: var(--danger-text); }
+@media(max-width:760px) {
+  .topbar { flex-wrap: wrap; height: auto; min-height: 76px; gap: 8px 14px; padding-top: 10px; padding-bottom: 10px; }
+  .topbar nav { height: auto; gap: 12px; margin-left: auto; }
+  .topbar .nav-active { padding: 8px 0; }
+  .topbar .connection { margin-left: 0; }
+  .topbar .theme-toggle { margin-left: auto; }
+  .laboratory .topbar .connection { width: auto; margin: 0; text-align: left; }
+  .laboratory .topbar nav a { padding: 8px 0; }
+}

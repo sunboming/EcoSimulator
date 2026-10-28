@@ -1,0 +1,40 @@
+.laboratory .expert-field{grid-template-columns:minmax(0,1fr) minmax(270px,340px);column-gap:30px;align-items:start}
+.precision-value{min-width:0;padding-top:0}
+.precision-value .precision-main{display:flex;gap:10px;align-items:center;justify-content:flex-start}
+.precision-value .precision-main>input[type=number]{width:0;flex:1;min-width:90px;max-width:none;font:24px var(--font-numeric),sans-serif;text-align:left;padding:8px 11px;min-height:46px;color:var(--text)}
+.precision-value .precision-main>span{font-size:10px;color:var(--muted);min-width:0;max-width:100px;overflow-wrap:anywhere}
+.precision-value .precision-main>button{flex:0 0 32px;min-width:32px;padding:4px;font-size:17px;background:transparent;color:var(--muted)}
+.precision-value .nudge-row{display:grid;grid-template-columns:34px minmax(60px,1fr) 103px 34px;gap:6px;align-items:center;margin-top:10px;justify-content:stretch}
+.precision-value .nudge-row button{padding:3px;font:18px var(--font-numeric),sans-serif;min-width:0;min-height:34px}
+.precision-value .nudge-row label{display:block;min-width:0}
+.precision-value .nudge-row input[type=number]{display:block;width:100%;min-width:0;max-width:none;padding:6px 7px;font:13px var(--font-numeric),sans-serif;text-align:center;min-height:34px;color:var(--text)}
+.precision-value .nudge-row select{width:100%;padding:6px 5px;font-size:10px;min-height:34px;min-width:0}
+.precision-value input[type=number]{appearance:textfield;-moz-appearance:textfield}
+.precision-value input[type=number]::-webkit-outer-spin-button,.precision-value input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.precision-value .alternate-input{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--border);margin-top:14px;padding-top:13px;font-size:10px;color:var(--muted)}
+.precision-value .alternate-input>span:first-child{max-width:118px;line-height:1.7}
+.precision-value .alternate-input>span:last-child{display:flex;align-items:center;gap:7px;min-width:0;flex:1;justify-content:flex-end}
+.precision-value .alternate-input input[type=number]{width:115px;max-width:100%;min-width:0;text-align:right;font:16px var(--font-numeric),sans-serif;padding:7px 8px;min-height:35px;color:var(--text)}
+.precision-value .alternate-input small{font-size:9px;max-width:65px;overflow-wrap:anywhere;color:var(--muted)}
+.precision-value .editor-note{font-size:9px;color:var(--muted);line-height:1.8;text-align:left;margin:7px 0 0}
+.precision-value .thermal-bounds{display:grid;grid-template-columns:1fr 18px 1fr;gap:8px;margin:13px 0 0;padding:10px 12px 13px;border:1px solid var(--border);border-radius:5px;min-width:0;background:var(--inset)}
+.precision-value .thermal-bounds legend{font-size:9px;color:var(--muted);line-height:1.8;padding:0 5px;max-width:100%}
+.precision-value .thermal-bounds label{font-size:10px;line-height:1.8;color:var(--muted);min-width:0}
+.precision-value .thermal-bounds input[type=number]{display:block;width:100%;min-width:0;max-width:none;font:16px var(--font-numeric),sans-serif;text-align:left;margin-top:5px;padding:7px 8px;color:var(--text)}
+.precision-value .thermal-bounds>span{align-self:end;justify-self:center;padding-bottom:11px;font-size:10px;color:var(--muted)}
+.precision-value .parameter-gauge{position:relative;display:block;height:8px;background:linear-gradient(90deg,var(--inset),var(--lime));border:1px solid var(--border);border-radius:4px;margin:17px 5px 0}
+.precision-value .temperature-gauge{background:linear-gradient(90deg,var(--blue),var(--mint) 38%,var(--lime) 63%,var(--orange))}
+.precision-value .parameter-gauge i{display:block;position:absolute;top:-4px;width:3px;height:14px;background:var(--text);border:1px solid var(--panel);transform:translateX(-50%);border-radius:2px;pointer-events:none}
+.precision-value .process-toggle{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:10px;margin-top:12px;padding:8px 10px;text-align:left;background:var(--surface)}
+.precision-value .process-toggle[aria-checked=true]{border-color:var(--lime)}
+.precision-value .process-toggle span{font-size:9px;color:var(--muted);font-weight:400}
+.precision-value .process-toggle[aria-checked=true] span{color:var(--lime)}
+.precision-value .input-feedback{font-size:10px;line-height:1.8;margin:9px 0 0;color:var(--orange);text-align:left}
+.precision-value>small{display:block;font:9px var(--font-numeric),sans-serif;color:var(--muted);text-align:left;line-height:1.8;margin-top:12px;overflow-wrap:anywhere}
+.precision-value>small b{color:var(--text)}
+.expert-field .field-identity p{max-width:470px}
+.input-guide{display:flex;gap:12px;border-left:2px solid var(--lime);padding:10px 13px;background:var(--surface);font-size:10px;color:var(--muted);line-height:1.9;margin:0 0 18px}
+.input-guide strong{font-weight:500;color:var(--text);white-space:nowrap}
+@media(min-width:1600px){.laboratory .expert-field{grid-template-columns:minmax(0,1fr) 360px}}
+@media(max-width:1100px){.laboratory .expert-field{grid-template-columns:minmax(0,1fr) minmax(235px,285px);column-gap:19px}.precision-value .nudge-row{grid-template-columns:30px minmax(46px,1fr) 87px 30px;gap:5px}.precision-value .nudge-row select{font-size:9px;padding:5px 3px}.precision-value .alternate-input{gap:8px;flex-wrap:wrap}.precision-value .alternate-input>span:first-child{max-width:100%}.precision-value .alternate-input>span:last-child{flex:1;min-width:100px}.precision-value .precision-main>input[type=number]{font-size:21px}.input-guide{flex-direction:column;gap:2px}}
+@media(max-width:760px){.laboratory .expert-field{grid-template-columns:1fr;gap:14px}.precision-value .precision-main>input[type=number]{font-size:25px;min-height:47px}.precision-value .precision-main>button{min-height:40px;flex-basis:36px}.precision-value .nudge-row{grid-template-columns:40px minmax(55px,1fr) 105px 40px;gap:6px}.precision-value .nudge-row input[type=number],.precision-value .nudge-row select,.precision-value .nudge-row button{min-height:40px}.precision-value .nudge-row select{font-size:10px;padding:7px 5px}.precision-value .alternate-input>span:first-child{max-width:130px}.precision-value .alternate-input input[type=number]{width:120px;min-height:40px}.precision-value .alternate-input small{max-width:60px}.precision-value .process-toggle{min-height:41px}.precision-value .editor-note{font-size:9px;line-height:1.9}.precision-value .thermal-bounds input[type=number]{min-height:41px}.input-guide{font-size:9px;margin-bottom:14px}}
