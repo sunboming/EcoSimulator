@@ -15,7 +15,7 @@ test('server runs without viewers, shares controls, enforces auth and restores S
   const sockets: WebSocket[] = [];
   const origin = `http://127.0.0.1:${port}`;
   const start = async () => {
-    child = spawn(process.execPath, ['dist/server/index.js'], { env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', DB_PATH: join(dir, 'world.sqlite'), ADMIN_TOKEN: 'test-secret', WORLD_WIDTH: '32', WORLD_HEIGHT: '24', MAX_ANIMALS: '100', SAVE_SECONDS: '5' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    child = spawn(process.execPath, ['dist/server/index.js'], { env: { ...process.env, PRIVATE_MODE: 'false', MAX_CLIENTS: '30', PORT: String(port), HOST: '127.0.0.1', DB_PATH: join(dir, 'world.sqlite'), ADMIN_TOKEN: 'test-secret', WORLD_WIDTH: '32', WORLD_HEIGHT: '24', MAX_ANIMALS: '100', SAVE_SECONDS: '5' }, stdio: ['ignore', 'pipe', 'pipe'] });
     let output = ''; child.stdout!.on('data', b => { output += b; }); child.stderr!.on('data', b => { output += b; });
     for (let i = 0; i < 100; i++) { if (output.includes('"started"')) return; if (child.exitCode !== null) throw new Error(output); await delay(50); }
     throw new Error(`startup timeout: ${output}`);

@@ -4,14 +4,16 @@ services:
     restart: unless-stopped
     init: true
     ports:
-      - "${BIND_IP:-0.0.0.0}:${PORT:-3000}:3000"
+      - "${BIND_IP:-127.0.0.1}:${PORT:-3000}:3000"
     environment:
       PORT: 3000
       WORLD_WIDTH: ${WORLD_WIDTH:-512}
       WORLD_HEIGHT: ${WORLD_HEIGHT:-384}
       WORLD_SEED: ${WORLD_SEED:-42}
       MAX_ANIMALS: ${MAX_ANIMALS:-1200}
-      MAX_CLIENTS: ${MAX_CLIENTS:-30}
+      PRIVATE_MODE: 'true'
+      IDLE_TIMEOUT_SECONDS: ${IDLE_TIMEOUT_SECONDS:-1800}
+      MAX_CLIENTS: 1
       TICK_HZ: ${TICK_HZ:-5}
       PUSH_HZ: ${PUSH_HZ:-2}
       SAVE_SECONDS: ${SAVE_SECONDS:-30}

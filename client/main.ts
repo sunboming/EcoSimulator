@@ -13,6 +13,7 @@ import { buildEnvironmentPanel, environmentKeys } from './environment-panel';
 import { animalSprite, portrait } from './sprites';
 import { maturity } from '../shared/model';
 import { NaturePanel } from './nature-panel';
+import { IdleMonitor } from './idle';
 import type { NatureSettings } from '../shared/nature';
 
 buildEnvironmentPanel();
@@ -21,6 +22,14 @@ let state: Snapshot | undefined, ws: WebSocket | undefined, token = '', candidat
 let connected = false, protectedWorld = true, history: Stats[] = [], lastPacket = 0, attempts = 0;
 let toastTimer: ReturnType<typeof setTimeout>, reconnectTimer: ReturnType<typeof setTimeout>, commandTimer: ReturnType<typeof setTimeout>;
 const pending = new PendingCommand(), draft = new EnvironmentDraft();
+const idle = new IdleMonitor(() => ws, () => {
+  clearTimeout(reconnectTimer); token = ''; candidateToken = ''; draft.clear();
+  $<HTMLInputElement>('token').value = ''; $<HTMLDialogElement>('auth-dialog').close();
+  disconnectFeedback(); ws?.close(4001, 'Idle timeout');
+  $('connection').textContent = '● 闲置已下线';
+  $('sync-message').textContent = '长时间未操作，已自动下线。世界继续演化，点击“重新进入”恢复连接。';
+  $('reconnect').textContent = '重新进入';
+});
 const emptyInspector = $('inspector').innerHTML;
 const chart = new PopulationChart($<HTMLCanvasElement>('chart'));
 const map = new WorldView($<HTMLCanvasElement>('world'), () => inspect(), () => updateFollow(), requestView);
@@ -88,12 +97,16 @@ function disconnectFeedback() {
 }
 function connect() {
   clearTimeout(reconnectTimer);
+  if (!idle.check()) return;
   if (!navigator.onLine) { disconnectFeedback(); return; }
   if (ws && ws.readyState < WebSocket.CLOSING) return;
   const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`); ws = socket;
   $('connection').textContent = '● 正在同步';
-  socket.onclose = () => {
-    if (ws !== socket) return; disconnectFeedback();
+  socket.onclose = event => {
+    if (ws !== socket) return;
+    if (event.code === 4001) idle.stop();
+    if (!idle.check()) return;
+    disconnectFeedback();
     reconnectTimer = setTimeout(connect, Math.min(15000, 1500 * 2 ** Math.min(attempts++, 3)) + Math.random() * 500);
   };
   socket.onerror = () => socket.close();
@@ -101,6 +114,8 @@ function connect() {
     if (ws !== socket) return;
     lastPacket = Date.now();
     const msg = JSON.parse(event.data);
+    if (msg.type === 'snapshot') idle.configure(msg.idleTimeoutMs);
+    if (!idle.check()) return;
     if (msg.type === 'error' || msg.type === 'ack') {
       const action = pending.finish(msg.requestId); if (!action) return;
       clearTimeout(commandTimer);
@@ -145,6 +160,7 @@ function connect() {
 }
 function reconnectNow() {
   clearTimeout(reconnectTimer);
+  if (!idle.check()) return;
   const old = ws; ws = undefined; old?.close();
   disconnectFeedback(); attempts = 0; connect();
 }
@@ -272,9 +288,9 @@ $('reset').onclick = () => { if (!state) return; $('reset-error').textContent = 
 $('reset-cancel').onclick = () => $<HTMLDialogElement>('reset-dialog').close();
 $('reset-dialog').addEventListener('cancel', e => { if (pending.action === 'reset') e.preventDefault(); });
 $('reset-confirm').onclick = () => send('reset', 'reset');
-$('reconnect').onclick = reconnectNow;
+$('reconnect').onclick = () => { idle.resume(); $('reconnect').textContent = '立即重连'; reconnectNow(); };
 window.addEventListener('online', reconnectNow);
-window.addEventListener('offline', () => { disconnectFeedback(); ws?.close(); });
+window.addEventListener('offline', () => { if (!idle.check()) return; disconnectFeedback(); ws?.close(); });
 window.addEventListener('beforeunload', e => { if (draft.dirty) { e.preventDefault(); e.returnValue = ''; } });
 setInterval(() => { if (connected && Date.now() - lastPacket > 8000) { disconnectFeedback(); ws?.close(); } }, 2000);
 for (const species of ['grazer', 'hunter'] as const) {

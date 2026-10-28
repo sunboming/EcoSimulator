@@ -15,6 +15,7 @@ import { LabPlot, type Curve } from './laboratory-charts';
 import { inputMarkup, auxiliaryFor, toAuxiliary, fromAuxiliary, thermalPair, thermalPatch, nudgeValue, validatePatch, setAuxiliaryValue } from './parameter-inputs';
 import { ConsoleGestures } from './console-gestures';
 import { displayNumber, formatTimecode, parseTimecode } from '../shared/parameter-presentation';
+import { IdleMonitor } from './idle';
 
 type LabState = Pick<Snapshot, 'epoch' | 'width' | 'height' | 'params' | 'stats' | 'history' | 'events' | 'protected' | 'ecology'>;
 const keys = Object.keys(allParameterSpecs) as EnvironmentKey[], draft = new EnvironmentDraft(), gate = new PendingCommand();
@@ -274,13 +275,23 @@ function analytics() {
 function disconnected() {
   connected = false; gate.cancel(); candidate = ''; clearTimeout(commandTimer); $('lab-connection').textContent = '● 连接中断'; $('lab-offline').hidden = false; controls();
 }
+const idle = new IdleMonitor(() => ws, () => {
+  clearTimeout(reconnectTimer); token = ''; candidate = ''; draft.clear(); clearInvalid(); consoleGestures.cancel();
+  $<HTMLInputElement>('lab-token').value = ''; $<HTMLDialogElement>('lab-auth').close();
+  disconnected(); ws?.close(4001, 'Idle timeout'); syncFields();
+  $('lab-connection').textContent = '● 闲置已下线';
+  $('lab-offline-message').textContent = '长时间未操作，已自动下线。世界继续演化，点击“重新进入”恢复连接。';
+  $('lab-reconnect').textContent = '重新进入';
+});
 function connect() {
-  clearTimeout(reconnectTimer); if (ws && ws.readyState < WebSocket.CLOSING) return;
+  clearTimeout(reconnectTimer); if (!idle.check()) return; if (ws && ws.readyState < WebSocket.CLOSING) return;
   const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws?mode=lab`); ws = socket;
   socket.onerror = () => socket.close();
-  socket.onclose = () => { if (ws !== socket) return; disconnected(); reconnectTimer = setTimeout(connect, Math.min(15000, 1000 * 2 ** Math.min(4, retries++))); };
+  socket.onclose = event => { if (ws !== socket) return; if (event.code === 4001) idle.stop(); if (!idle.check()) return; disconnected(); reconnectTimer = setTimeout(connect, Math.min(15000, 1000 * 2 ** Math.min(4, retries++))); };
   socket.onmessage = e => {
     if (ws !== socket) return; lastPacket = Date.now(); const msg = JSON.parse(e.data);
+    if (msg.type === 'snapshot') idle.configure(msg.idleTimeoutMs);
+    if (!idle.check()) return;
     if (msg.type === 'ack' || msg.type === 'error') {
       const action = gate.finish(msg.requestId); if (!action) return; clearTimeout(commandTimer);
       if (msg.type === 'error') { if (action === 'auth') $('lab-auth-error').textContent = msg.message; else toast(msg.message, true); if (msg.message.includes('口令') && action !== 'auth') token = ''; }
@@ -298,7 +309,7 @@ function connect() {
     draft.reconcile(state!.params); syncFields(); preview(); analytics();
   };
 }
-$('lab-reconnect').onclick = () => { const old = ws; ws = undefined; old?.close(); disconnected(); retries = 0; connect(); };
+$('lab-reconnect').onclick = () => { idle.resume(); $('lab-reconnect').textContent = '立即重连'; $('lab-offline-message').textContent = '连接中断，当前为最后同步数据。正在自动重连；断线期间不能应用参数。'; const old = ws; ws = undefined; old?.close(); disconnected(); retries = 0; connect(); };
 window.addEventListener('online', connect); window.addEventListener('offline', () => ws?.close());
 window.addEventListener('beforeunload', e => { if (draft.dirty || invalidKeys.size || invalidAux.size) { e.preventDefault(); e.returnValue = ''; } });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { preview(); analytics(); } });

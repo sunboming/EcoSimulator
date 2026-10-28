@@ -1,5 +1,13 @@
 # 野境 WILDHAVEN
 
+当前默认采用**单人私有访问**：页面、静态资源和 WebSocket 均要求 HTTP Basic 登录，用户名固定为 `admin`，密码为 `.env` 中的 `ADMIN_TOKEN`。浏览器首次访问会弹出登录框，公网必须经 HTTPS 使用。私有模式强制最多 1 个实时连接，第二个标签页/设备会被拒绝连接；关闭旧标签页后再打开新页面。单连接限制不等于识别自然人，口令只应由本人持有。
+
+**挂机自动下线**：默认连续 30 分钟没有页面内鼠标、触摸、键盘或滚轮操作就断开实时连接、释放名额，清除页面管理口令及未应用草稿，并停止自动重连。点击“重新进入”或主动刷新页面可恢复观看，修改世界需重新解锁。切换后台、自动跟随、地图更新、推送和心跳不会刷新活动时间；服务器也会独立执行超时，即使页面挂起或没有运行前端计时器仍会断开。世界继续演化，不自动暂停。浏览器缓存的 HTTP Basic 凭据不会被此次下线清除，已显示的世界画面仍保留，这属于实时会话下线。持有口令的脚本能主动报告活动，本功能不识别人类，也不能阻止持有凭据者重新连接。
+
+可在 `.env` 设置 `IDLE_TIMEOUT_SECONDS=1800`（单位：秒，允许 1–86400），修改后执行 `docker compose up -d` 生效。服务器每秒检查一次，正常关闭后释放名额；不响应关闭握手的连接会在约 2 秒后强制清理。后台休眠或断网后恢复页面时，前端也会检查实际经过时间，超时后不会自动恢复连接。
+
+私有模式禁止空口令、少于 32 个字符和示例口令。应用使用有界的全局请求预算（突发 60 次，补充 10 次/秒）以及跨连接错误鉴权预算（突发 6 次，补充 1 次/10秒）。这不能替代代理层和云端抗 DDoS 防护。`/health` 无需登录但只返回 `{ok}`，详细指标在登录后的 `/health/details`，可用 `curl -u admin https://你的域名/health/details` 按提示输入密码。
+
 面向低配置 Linux 服务器的共享数字生态模拟器。TypeScript + Node.js 24 + Canvas + WebSocket + SQLite；生产依赖只有 `ws`，无 GPU、外部 AI API、云服务或在线字体。前端仅渲染与发送控制命令，所有生物行为由服务器执行。
 
 ## 快速体验
@@ -8,11 +16,13 @@
 
 ```bash
 npm ci
+cp .env.example .env
+# 编辑 .env，将 ADMIN_TOKEN 替换为 openssl rand -hex 32 生成的口令。
 npm run build
 npm start
 ```
 
-访问 `http://localhost:3000`。服务器启动即开始演化，关闭所有浏览器后仍继续。开发时 `npm run dev` 会先构建并监听服务端源码；修改前端后重新运行该命令构建。无 `.env` 时本地默认开放控制；公网部署必须配置口令。
+访问 `http://localhost:3000`，使用 `admin` 和管理口令登录。服务器启动即开始演化，关闭所有浏览器后仍继续。开发时 `npm run dev` 会先构建并监听服务端源码；修改前端后重新运行该命令构建。缺少有效口令时默认拒绝启动。原生运行可显式设置 `PRIVATE_MODE=false` 恢复共享观看，Compose 固定开启私有模式。
 
 界面提供暂停、0.5–8 倍速度、13 项快捷参数、独立的47项详细参数与分析页、挑战方案、生态干预、保留进度扩图、小地图、资源图层和个体跟随。新世界默认 **512×384**，可逐次扩展至单边最多 **2048** 格。一天为 120 模拟秒，每季 6 天、每年 24 天，昼夜和季节实际影响生态；动物年龄以模拟秒计算。
 
@@ -87,7 +97,13 @@ npm start
 
 动物使用本地 Canvas 生成并缓存的 32px 像素精灵，支持行走/跳跃、追逐与摄食帧，按左右方向翻转。白兔长耳与白尾、狐狸尖耳与蓬尾保持不同轮廓；页面的物种图鉴和个体档案使用同一套形象。数字使用随项目打包的 Chakra Petch 字体，无运行时外部字体请求；授权见 `client/public/fonts/OFL.txt`，来源为 [Google Fonts 官方仓库](https://github.com/google/fonts/tree/main/ofl/chakrapetch)。
 
-## Linux 一键部署
+## 原生部署（当前选用）
+
+推荐使用 [Git简化部署](deploy/GIT_DEPLOY.md)：首次 `git clone` 后运行安装脚本，以后只需 `sudo wildhaven update`；支持 `rollback` 和更换兼容仓库，配置与存档独立保留。
+
+腾讯云OpenCloudOS 9 + 宝塔、2核2GB环境采用独立Node 24 + systemd托管，详细步骤见 [原生部署说明](deploy/NATIVE_DEPLOY.md)。配套 [systemd服务](deploy/wildhaven.service) 和 [原生配置示例](deploy/native.env.example) 使用独立目录、回环地址3001端口、512MB内存硬上限和约1核CPU配额，保留已有静态网站。无需Docker，不新增或修改宝塔反向代理；通过已有HTTPS入口或SSH隧道登录。只有systemd配置会对原生服务实施这些配额，Docker专用的 `MEM_LIMIT/CPU_LIMIT` 对原生运行无效。
+
+## Linux Docker 部署（备选）
 
 准备 Docker Engine 与 Compose v2 插件（[官方安装说明](https://docs.docker.com/engine/install/)）。建议从 1 核、512 MB 内存起步，留出镜像构建空间；小内存机器可在其他机器构建同架构镜像后导入。
 
@@ -99,7 +115,7 @@ docker compose ps
 docker compose logs -f --tail=100 eco
 ```
 
-开放所选端口后，访问 `http://服务器IP:3000`。访客可直接观看，点击“管理员解锁”输入口令后才能控制。口令只保存在浏览器当前页内存，刷新后需要重新输入。生产 Compose 强制要求非空 ADMIN_TOKEN；请勿保留示例值。
+Compose 默认只绑定 `127.0.0.1`，按下一节配置域名和 HTTPS 后访问。浏览器先使用 `admin` 和管理口令登录，进入页面后点击“管理员解锁”再次输入同一口令即可控制。页面退出管理只清除页面内的控制口令，不会清除浏览器缓存的 HTTP Basic 凭据；结束使用可关闭专用隐私窗口，泄露后应修改口令并重启服务。
 
 ```bash
 sudo systemctl enable --now docker
@@ -150,16 +166,18 @@ location / {
 | 变量 | 默认值 | 作用/范围 |
 | --- | --- | --- |
 | PORT / HOST | 3000 / 0.0.0.0 | 原生监听端口/地址 |
-| BIND_IP | 0.0.0.0 | Compose 宿主绑定地址 |
+| BIND_IP | 127.0.0.1 | Compose 宿主绑定地址 |
+| PRIVATE_MODE | true | 原生私有访问开关，Compose 固定为 true |
+| IDLE_TIMEOUT_SECONDS | 1800 | 页面无操作自动下线时间，1–86400 秒；不受模拟暂停和倍速影响 |
 | WORLD_WIDTH / WORLD_HEIGHT | 512 / 384 | 各 24–2048 格，仅新建/重置生效；旧世界可通过扩图保留进度 |
 | WORLD_SEED | 42 | 0–4294967295，可重复随机种子 |
 | MAX_ANIMALS | 1200 | 20–5000；降低后恢复时截断超额个体 |
 | TICK_HZ | 5 | 1–20，服务器调度唤醒频率 |
 | PUSH_HZ | 2 | 1–5，WebSocket 推送频率 |
 | SAVE_SECONDS | 30 | 5–3600，存档周期 |
-| MAX_CLIENTS | 30 | 1–200，同时在线上限 |
+| MAX_CLIENTS | 1 | 私有模式强制为 1；原生共享模式允许 1–200 |
 | DB_PATH | ./data/world.sqlite | 原生存档路径；容器固定 /app/data/world.sqlite |
-| ADMIN_TOKEN | 空 | 原生空值允许所有人控制；Compose 强制设置 |
+| ADMIN_TOKEN | 空 | 私有模式要求至少32字符且非示例值，同时用于入口登录与页面控制 |
 | PUBLIC_ORIGIN | 空 | 唯一允许的浏览器源，空时同 Host 校验 |
 | MEM_LIMIT / CPU_LIMIT | 256m / 0.50 | Compose 内存/CPU 配额 |
 | NODE_HEAP_MB | 128 | Compose V8 堆上限，需低于内存配额 |
@@ -229,7 +247,7 @@ docker compose logs --tail=50 eco
 | 容器反复 OOM | `docker inspect` 检查 OOMKilled，降低规模/动物上限/访客数或提高 MEM_LIMIT |
 | CPU/带宽较高 | 降低倍速、PUSH_HZ、MAX_ANIMALS 和 MAX_CLIENTS；检查 `docker stats` |
 
-Compose 日志轮转最多约 15 MB。世界与历史数据有界，但数据卷没有硬磁盘配额；需要主机监控磁盘余量，并自行轮转备份。`/health` 返回 tick、个体数/容量、客户端数、最近批次模拟耗时、最近批次丢弃的积压步数 droppedSteps、RSS，不包含口令。
+Compose 日志轮转最多约 15 MB。世界与历史数据有界，但数据卷没有硬磁盘配额；需要主机监控磁盘余量，并自行轮转备份。`/health/details` 在私有模式登录后返回 tick、个体数/容量、客户端数、最近批次模拟耗时、最近批次丢弃的积压步数 droppedSteps、RSS，不包含口令；私有模式的 `/health` 只返回健康状态。
 
 ## 架构与生态规则
 

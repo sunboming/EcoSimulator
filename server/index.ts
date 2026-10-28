@@ -8,16 +8,20 @@ import { config } from './config.js';
 import { Store } from './store.js';
 import { World } from './world.js';
 import { FixedClock } from './clock.js';
+import { PrivateAccess } from './access.js';
+import { IdleDeadline } from '../shared/idle.js';
 import type { Intervention, ViewRect } from '../shared/types.js';
 import { buildView, initialView, normalizeView, overview } from './viewport.js';
 
+// Refuse an unsafe private configuration before opening or creating the database.
+const access = new PrivateAccess(config.privateMode, config.adminToken);
 const store = new Store(config.dbPath);
 let world = store.load() ?? new World(config.width, config.height, config.seed, config.maxAnimals);
 // Limits are operational settings and apply to restored worlds too.
 world.maxAnimals = config.maxAnimals;
 if (world.animals.length > world.maxAnimals) world.animals = world.animals.slice(0, world.maxAnimals);
 let epoch = randomUUID(), lastStepMs = 0, saveError = false;
-const viewers = new Map<WebSocket, { view: ViewRect; seen: Map<number, number>; analysis: boolean }>();
+const viewers = new Map<WebSocket, { view: ViewRect; seen: Map<number, number>; analysis: boolean; idle: IdleDeadline; closingAt?: number }>();
 let overviewCache = overview(world), overviewTime = performance.now();
 let lastSampleTick = world.history.at(-1)?.tick ?? -1;
 const root = fileURLToPath(new URL('../public/', import.meta.url));
@@ -26,7 +30,17 @@ const server = createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'");
-  if (req.url === '/health') { res.writeHead(saveError ? 503 : 200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: !saveError, tick: world.tick, world: [world.width, world.height], regions: world.habitat.updated.length, activeRegions: world.habitat.activeRegions, updatedRegions: world.habitat.updatedRegions, animals: world.animals.length, maxAnimals: world.maxAnimals, clients: wss.clients.size, stepMs: +lastStepMs.toFixed(2), droppedSteps: clock.droppedSteps, memoryMB: Math.round(process.memoryUsage().rss / 1048576) })); return; }
+  // Container probes expose only liveness/save status in private mode, never world data.
+  if (config.privateMode && req.url === '/health') {
+    if (!access.probe()) { res.writeHead(429, { 'Retry-After': '10', 'Cache-Control': 'no-store' }); res.end(); return; }
+    res.writeHead(saveError ? 503 : 200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ ok: !saveError })); return;
+  }
+  const admission = access.check(req.headers.authorization);
+  if (admission !== 200) {
+    res.writeHead(admission, { 'Cache-Control': 'no-store', ...(admission === 401 ? { 'WWW-Authenticate': 'Basic realm="Wildhaven private", charset="UTF-8"' } : { 'Retry-After': '10' }) });
+    res.end(admission === 401 ? 'Authentication required' : 'Too many requests'); return;
+  }
+  if (req.url === '/health' || (config.privateMode && req.url === '/health/details')) { res.writeHead(saveError ? 503 : 200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ ok: !saveError, tick: world.tick, world: [world.width, world.height], regions: world.habitat.updated.length, activeRegions: world.habitat.activeRegions, updatedRegions: world.habitat.updatedRegions, animals: world.animals.length, maxAnimals: world.maxAnimals, clients: wss.clients.size, stepMs: +lastStepMs.toFixed(2), droppedSteps: clock.droppedSteps, memoryMB: Math.round(process.memoryUsage().rss / 1048576) })); return; }
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); res.end(); return; }
   try {
     const path = decodeURIComponent(new URL(req.url ?? '/', 'http://local').pathname);
@@ -34,15 +48,21 @@ const server = createServer(async (req, res) => {
     const rel = relative(root, file);
     if (rel.startsWith('..') || isAbsolute(rel)) { res.writeHead(403); res.end(); return; }
     const info = await stat(file); if (!info.isFile()) throw new Error('not file');
-    res.writeHead(200, { 'Content-Type': mime[extname(file)] ?? 'application/octet-stream', 'Cache-Control': path.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache' });
+    res.writeHead(200, { 'Content-Type': mime[extname(file)] ?? 'application/octet-stream', 'Cache-Control': path.startsWith('/assets/') ? `${config.privateMode ? 'private' : 'public'}, max-age=31536000, immutable` : config.privateMode ? 'no-store' : 'no-cache' });
     res.end(req.method === 'HEAD' ? undefined : await readFile(file));
   } catch { res.writeHead(404); res.end('Not found'); }
 });
 const wss = new WebSocketServer({ noServer: true, maxPayload: 4096, perMessageDeflate: false });
 server.on('upgrade', (req, socket, head) => {
+  const admission = access.check(req.headers.authorization);
+  if (admission !== 200) {
+    socket.end(`HTTP/1.1 ${admission} ${admission === 401 ? 'Unauthorized' : 'Too Many Requests'}\r\nConnection: close\r\n${admission === 401 ? 'WWW-Authenticate: Basic realm="Wildhaven private"\r\n' : 'Retry-After: 10\r\n'}Content-Length: 0\r\n\r\n`); return;
+  }
   const origin = req.headers.origin;
   const validOrigin = origin && (config.publicOrigin ? origin === config.publicOrigin : (() => { try { return new URL(origin).host === req.headers.host; } catch { return false; } })());
-  const path = new URL(req.url ?? '/', 'http://local');
+  let path: URL;
+  try { path = new URL(req.url ?? '/', 'http://local'); }
+  catch { socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
   if (path.pathname !== '/ws' || (path.search && path.search !== '?mode=lab') || !validOrigin || wss.clients.size >= config.maxClients) { socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); socket.destroy(); return; }
   wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
 });
@@ -52,7 +72,7 @@ function send(ws: WebSocket, message: string) {
 }
 function snapshotMessage(ws: WebSocket) {
   const viewer = viewers.get(ws)!; viewer.seen.clear();
-  return JSON.stringify({ type: 'snapshot', epoch, width: world.width, height: world.height, terrain: [], plants: [], ...(viewer.analysis ? {} : buildView(world, viewer.view, viewer.seen)),
+  return JSON.stringify({ type: 'snapshot', idleTimeoutMs: config.idleTimeoutMs, epoch, width: world.width, height: world.height, terrain: [], plants: [], ...(viewer.analysis ? {} : buildView(world, viewer.view, viewer.seen)),
     ...(!viewer.analysis ? { overview: overviewCache } : {}), ecology: world.ecology(), focus: world.focus, params: world.params, stats: world.stats(), history: world.history, protected: !!config.adminToken, events: world.events });
 }
 function authorized(token: unknown) {
@@ -66,18 +86,21 @@ let lastIntervention = 0;
 let lastReset = -Infinity;
 wss.on('connection', (ws, req) => {
   ws.on('error', error => console.warn('websocket:', error.message));
-  viewers.set(ws, { view: initialView(world), seen: new Map(), analysis: req.url === '/ws?mode=lab' });
+  viewers.set(ws, { view: initialView(world), seen: new Map(), analysis: req.url === '/ws?mode=lab', idle: new IdleDeadline(config.idleTimeoutMs) });
   alive.add(ws); send(ws, snapshotMessage(ws));
   ws.on('close', () => viewers.delete(ws));
   let windowStart = Date.now(), count = 0, viewCount = 0, totalCount = 0;
   ws.on('pong', () => alive.add(ws));
   ws.on('message', raw => {
+    const viewer = viewers.get(ws);
+    if (!viewer || viewer.idle.expired()) { ws.close(4001, 'Idle timeout'); return; }
     if (Date.now() - windowStart > 10000) { windowStart = Date.now(); count = 0; viewCount = 0; totalCount = 0; }
     if (++totalCount > 60) { ws.close(1008, 'Too many messages'); return; }
     let requestId: string | undefined;
     try {
       const msg = JSON.parse(raw.toString());
       if (!msg || typeof msg !== 'object' || Array.isArray(msg)) throw new Error('命令必须是对象');
+      if (msg.type === 'activity') { viewer.idle.touch(); return; }
       if (msg.type === 'watch') {
         if (++viewCount > 40) { ws.close(1008, 'Too many viewport changes'); return; }
         const viewer = viewers.get(ws)!; viewer.view = normalizeView(msg.view, world); viewer.seen.clear();
@@ -143,7 +166,15 @@ const push = setInterval(() => {
 function save() { try { store.save(world); saveError = false; } catch (e) { saveError = true; console.error('save failed', e); } }
 const saving = setInterval(save, config.saveSeconds * 1000);
 const heartbeat = setInterval(() => { for (const ws of wss.clients) { if (!alive.has(ws)) ws.terminate(); else { alive.delete(ws); ws.ping(); } } }, 30000);
+const idleSweep = setInterval(() => {
+  for (const [ws, viewer] of viewers) {
+    if (!viewer.idle.expired()) continue;
+    if (viewer.closingAt === undefined) { viewer.closingAt = Date.now(); ws.close(4001, 'Idle timeout'); }
+    // A peer ignoring the close handshake must still release the single connection slot.
+    else if (Date.now() - viewer.closingAt >= 2000) ws.terminate();
+  }
+}, 1000);
 let closing = false;
-function shutdown() { if (closing) return; closing = true; for (const timer of [simulation, push, saving, heartbeat]) clearInterval(timer); save(); for (const ws of wss.clients) ws.terminate(); wss.close(); server.close(() => { store.close(); process.exit(saveError ? 1 : 0); }); }
+function shutdown() { if (closing) return; closing = true; for (const timer of [simulation, push, saving, heartbeat, idleSweep]) clearInterval(timer); save(); for (const ws of wss.clients) ws.terminate(); wss.close(); server.close(() => { store.close(); process.exit(saveError ? 1 : 0); }); }
 process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);
 server.listen(config.port, config.host, () => console.log(JSON.stringify({ event: 'started', port: config.port, tick: world.tick, protected: !!config.adminToken })));

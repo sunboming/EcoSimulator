@@ -1,0 +1,47 @@
+[Unit]
+Description=Wildhaven private ecosystem simulator
+After=network.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=wildhaven
+Group=wildhaven
+WorkingDirectory=/opt/wildhaven/app
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/wildhaven.env
+ExecStart=/opt/wildhaven/node/bin/node --max-old-space-size=256 /opt/wildhaven/app/dist/server/index.js
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+UMask=0077
+
+# Keep world data outside the application directory, including across code updates.
+StateDirectory=wildhaven
+StateDirectoryMode=0700
+ReadWritePaths=/var/lib/wildhaven
+
+# 100% is one CPU worth of time, not both CPUs of the target host.
+CPUAccounting=true
+CPUQuota=100%
+MemoryAccounting=true
+MemoryHigh=384M
+MemoryMax=512M
+TasksMax=64
+LimitNOFILE=1024
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target
